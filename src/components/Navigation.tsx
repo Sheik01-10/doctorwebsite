@@ -27,7 +27,7 @@ export default function Navigation() {
             >
               <img src={logo} alt="Logo" className="h-9 w-9 object-contain" />
               <span className="text-lg font-bold text-blue-600">
-                Shanmuga Diabetic Centre
+                Shanmuga Diabetic Clinic
               </span>
             </button>
 
