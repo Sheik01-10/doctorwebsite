@@ -3,10 +3,19 @@ import { useState } from 'react';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 
+interface AppointmentData {
+  name: string;
+  phone: string;
+  date: string;
+  time: string;
+  doctor: string;
+  reason?: string;
+}
+
 interface AppointmentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onBooked: (data: any) => void; // 🔥 IMPORTANT
+  onBooked: (data: AppointmentData) => void; // 🔥 popup trigger
 }
 
 export default function AppointmentModal({
@@ -14,7 +23,7 @@ export default function AppointmentModal({
   onClose,
   onBooked,
 }: AppointmentModalProps) {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<AppointmentData>({
     name: '',
     phone: '',
     date: '',
@@ -28,37 +37,41 @@ export default function AppointmentModal({
 
   if (!isOpen) return null;
 
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      phone: '',
+      date: '',
+      time: '',
+      doctor: 'Dr. Saravanan',
+      reason: '',
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
+
     setLoading(true);
 
     try {
-      // 🔥 SAVE TO FIRESTORE (ADMIN LIVE UPDATE)
+      // 🔥 SAVE TO FIRESTORE
       await addDoc(collection(db, 'appointments'), {
         ...formData,
         createdAt: serverTimestamp(),
         status: 'Pending',
       });
 
-      // 🔥 TRIGGER POPUP IN HOME
+      // 🔥 Trigger success popup in home
       onBooked(formData);
 
       setSubmitted(true);
 
-      // close modal after short delay
       setTimeout(() => {
         setSubmitted(false);
-        setFormData({
-          name: '',
-          phone: '',
-          date: '',
-          time: '',
-          doctor: 'Dr. Saravanan',
-          reason: '',
-        });
+        resetForm();
         onClose();
       }, 1200);
-
     } catch (error) {
       alert('Something went wrong. Please try again.');
     } finally {
@@ -67,7 +80,7 @@ export default function AppointmentModal({
   };
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
     setFormData({
       ...formData,
@@ -76,12 +89,19 @@ export default function AppointmentModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-
+    <div
+      className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+      onClick={onClose} // backdrop close
+    >
+      <div
+        className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()} // prevent close on modal click
+      >
         {/* HEADER */}
         <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
-          <h2 className="text-2xl font-bold text-gray-900">Book Appointment</h2>
+          <h2 className="text-2xl font-bold text-gray-900">
+            Book Appointment
+          </h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <X size={24} />
           </button>
@@ -103,7 +123,6 @@ export default function AppointmentModal({
         ) : (
           /* FORM */
           <form onSubmit={handleSubmit} className="p-6 space-y-6">
-
             <div className="grid md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-semibold mb-2">
@@ -185,7 +204,6 @@ export default function AppointmentModal({
                 {loading ? 'Booking...' : 'Book Appointment'}
               </button>
             </div>
-
           </form>
         )}
       </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
 
 import Navigation from './components/Navigation';
@@ -10,12 +10,12 @@ import AppointmentModal from './components/AppointmentModal';
 import QueueModal from './components/QueueModal';
 import AppointmentPopup from './components/AppointmentPopup';
 
-// 🔐 ADMIN
+// ADMIN
 import AdminLogin from './components/AdminLogin';
 import AdminDashboard from './components/AdminDashboard';
 import ProtectedRoute from './components/ProtectedRoute';
 
-// appointment type
+// ✅ APPOINTMENT TYPE
 interface Appointment {
   name: string;
   phone: string;
@@ -52,10 +52,18 @@ export default function App() {
           }
         />
 
-        {/* 🔐 ADMIN LOGIN */}
-        <Route path="/admin/login" element={<AdminLogin />} />
+        {/* 🔥 QR → DIRECT APPOINTMENT */}
+        <Route
+          path="/appointment"
+          element={
+            <AppointmentAutoOpen
+              openAppointment={() => setIsAppointmentModalOpen(true)}
+            />
+          }
+        />
 
-        {/* 🔒 ADMIN DASHBOARD */}
+        {/* 🔐 ADMIN */}
+        <Route path="/admin/login" element={<AdminLogin />} />
         <Route
           path="/admin/dashboard"
           element={
@@ -66,7 +74,7 @@ export default function App() {
         />
       </Routes>
 
-      {/* FOOTER (ALL PAGES) */}
+      {/* FOOTER */}
       <footer className="bg-gray-900 text-white py-8">
         <div className="max-w-7xl mx-auto px-4 text-center">
           <p className="text-gray-400">
@@ -75,20 +83,19 @@ export default function App() {
         </div>
       </footer>
 
-      {/* BOOK APPOINTMENT MODAL */}
+      {/* MODALS */}
       <AppointmentModal
         isOpen={isAppointmentModalOpen}
         onClose={() => setIsAppointmentModalOpen(false)}
-        onBooked={(data) => setLatestAppointment(data)}
+        onBooked={(data: Appointment) => setLatestAppointment(data)}
       />
 
-      {/* QUEUE MODAL */}
       <QueueModal
         isOpen={isQueueModalOpen}
         onClose={() => setIsQueueModalOpen(false)}
       />
 
-      {/* 🔥 SUCCESS POPUP */}
+      {/* ✅ SUCCESS POPUP */}
       {latestAppointment && (
         <AppointmentPopup
           data={latestAppointment}
@@ -97,4 +104,21 @@ export default function App() {
       )}
     </div>
   );
+}
+
+/* 🔥 AUTO OPEN WHEN QR SCANNED */
+function AppointmentAutoOpen({
+  openAppointment,
+}: {
+  openAppointment: () => void;
+}) {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      openAppointment();
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [openAppointment]);
+
+  return null;
 }
