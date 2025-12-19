@@ -1,12 +1,19 @@
 import { X, Calendar, Clock, User, Phone } from 'lucide-react';
 import { useState } from 'react';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { db } from '../firebase';
 
 interface AppointmentModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onBooked: (data: any) => void; // 🔥 IMPORTANT
 }
 
-export default function AppointmentModal({ isOpen, onClose }: AppointmentModalProps) {
+export default function AppointmentModal({
+  isOpen,
+  onClose,
+  onBooked,
+}: AppointmentModalProps) {
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -17,33 +24,46 @@ export default function AppointmentModal({ isOpen, onClose }: AppointmentModalPr
   });
 
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
 
-    // 🔹 SAVE TO LOCAL STORAGE
-    localStorage.setItem('latestAppointment', JSON.stringify(formData));
-
-    setSubmitted(true);
-
-    // 🔹 CLOSE MODAL AFTER 2 SECONDS
-    setTimeout(() => {
-      setSubmitted(false);
-      setFormData({
-        name: '',
-        phone: '',
-        date: '',
-        time: '',
-        doctor: 'Dr. Saravanan',
-        reason: '',
+    try {
+      // 🔥 SAVE TO FIRESTORE (ADMIN LIVE UPDATE)
+      await addDoc(collection(db, 'appointments'), {
+        ...formData,
+        createdAt: serverTimestamp(),
+        status: 'Pending',
       });
-      onClose();
 
-      // 🔹 GO BACK TO HOME (popup will show)
-      window.location.href = '/';
-    }, 2000);
+      // 🔥 TRIGGER POPUP IN HOME
+      onBooked(formData);
+
+      setSubmitted(true);
+
+      // close modal after short delay
+      setTimeout(() => {
+        setSubmitted(false);
+        setFormData({
+          name: '',
+          phone: '',
+          date: '',
+          time: '',
+          doctor: 'Dr. Saravanan',
+          reason: '',
+        });
+        onClose();
+      }, 1200);
+
+    } catch (error) {
+      alert('Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleChange = (
@@ -67,7 +87,7 @@ export default function AppointmentModal({ isOpen, onClose }: AppointmentModalPr
           </button>
         </div>
 
-        {/* SUCCESS SCREEN */}
+        {/* SUCCESS */}
         {submitted ? (
           <div className="p-8 text-center">
             <div className="bg-green-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -77,11 +97,10 @@ export default function AppointmentModal({ isOpen, onClose }: AppointmentModalPr
               Appointment Booked!
             </h3>
             <p className="text-gray-600 text-lg">
-              Your appointment details have been saved successfully.
+              Please wait while we confirm your appointment.
             </p>
           </div>
         ) : (
-
           /* FORM */
           <form onSubmit={handleSubmit} className="p-6 space-y-6">
 
@@ -143,35 +162,11 @@ export default function AppointmentModal({ isOpen, onClose }: AppointmentModalPr
                   className="w-full px-4 py-3 border rounded-lg"
                 >
                   <option value="">Select time</option>
-                  <option value="07:00 AM">07:00 AM</option>
-                  <option value="08:00 AM">08:00 AM</option>
-                  <option value="09:00 AM">09:00 AM</option>
-                  <option value="10:00 AM">10:00 AM</option>
-                  <option value="11:00 AM">11:00 AM</option>
-                  <option value="12:00 PM">12:00 PM</option>
-                  <option value="01:00 PM">01:00 PM</option>
-                  <option value="02:00 PM">02:00 PM</option>
-                  <option value="03:00 PM">03:00 PM</option>
-                  <option value="04:00 PM">04:00 PM</option>
-                  <option value="05:00 PM">05:00 PM</option>
-                  <option value="06:00 PM">06:00 PM</option>
                   <option value="07:00 PM">07:00 PM</option>
                   <option value="08:00 PM">08:00 PM</option>
                   <option value="09:00 PM">09:00 PM</option>
                 </select>
               </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold mb-2">
-                Doctor
-              </label>
-              <input
-                type="text"
-                value="Dr. Saravanan"
-                disabled
-                className="w-full px-4 py-3 border rounded-lg bg-gray-100"
-              />
             </div>
 
             <div className="flex gap-4 pt-4">
@@ -184,9 +179,10 @@ export default function AppointmentModal({ isOpen, onClose }: AppointmentModalPr
               </button>
               <button
                 type="submit"
+                disabled={loading}
                 className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold"
               >
-                Book Appointment
+                {loading ? 'Booking...' : 'Book Appointment'}
               </button>
             </div>
 

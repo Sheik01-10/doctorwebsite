@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { Routes, Route } from 'react-router-dom';
+
 import Navigation from './components/Navigation';
 import Hero from './components/Hero';
 import About from './components/About';
@@ -7,6 +9,11 @@ import Location from './components/Location';
 import AppointmentModal from './components/AppointmentModal';
 import QueueModal from './components/QueueModal';
 import AppointmentPopup from './components/AppointmentPopup';
+
+// 🔐 ADMIN
+import AdminLogin from './components/AdminLogin';
+import AdminDashboard from './components/AdminDashboard';
+import ProtectedRoute from './components/ProtectedRoute';
 
 // appointment type
 interface Appointment {
@@ -18,39 +25,52 @@ interface Appointment {
   reason?: string;
 }
 
-function App() {
+export default function App() {
   const [isAppointmentModalOpen, setIsAppointmentModalOpen] = useState(false);
   const [isQueueModalOpen, setIsQueueModalOpen] = useState(false);
-
-  // 🔹 popup state
-  const [latestAppointment, setLatestAppointment] = useState<Appointment | null>(null);
-
-  // 🔹 load saved appointment on page load
-  useEffect(() => {
-    const saved = localStorage.getItem('latestAppointment');
-    if (saved) {
-      setLatestAppointment(JSON.parse(saved));
-    }
-  }, []);
+  const [latestAppointment, setLatestAppointment] =
+    useState<Appointment | null>(null);
 
   return (
     <div className="min-h-screen bg-white">
       <Navigation />
 
-      <Hero
-        onGetAppointment={() => setIsAppointmentModalOpen(true)}
-        onViewQueue={() => setIsQueueModalOpen(true)}
-      />
+      <Routes>
+        {/* 🏠 HOME */}
+        <Route
+          path="/"
+          element={
+            <>
+              <Hero
+                onGetAppointment={() => setIsAppointmentModalOpen(true)}
+                onViewQueue={() => setIsQueueModalOpen(true)}
+              />
+              <About />
+              <Doctors />
+              <Location />
+            </>
+          }
+        />
 
-      <About />
-      <Doctors />
-      <Location />
+        {/* 🔐 ADMIN LOGIN */}
+        <Route path="/admin/login" element={<AdminLogin />} />
 
+        {/* 🔒 ADMIN DASHBOARD */}
+        <Route
+          path="/admin/dashboard"
+          element={
+            <ProtectedRoute>
+              <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
+      </Routes>
+
+      {/* FOOTER (ALL PAGES) */}
       <footer className="bg-gray-900 text-white py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        <div className="max-w-7xl mx-auto px-4 text-center">
           <p className="text-gray-400">
             &copy; 2025 Shanmuga Diabetic Clinic. All rights reserved.
-            Providing quality healthcare with compassion.
           </p>
         </div>
       </footer>
@@ -59,6 +79,7 @@ function App() {
       <AppointmentModal
         isOpen={isAppointmentModalOpen}
         onClose={() => setIsAppointmentModalOpen(false)}
+        onBooked={(data) => setLatestAppointment(data)}
       />
 
       {/* QUEUE MODAL */}
@@ -67,18 +88,13 @@ function App() {
         onClose={() => setIsQueueModalOpen(false)}
       />
 
-      {/* 🔥 APPOINTMENT BOOKED POPUP */}
+      {/* 🔥 SUCCESS POPUP */}
       {latestAppointment && (
         <AppointmentPopup
           data={latestAppointment}
-          onClose={() => {
-            setLatestAppointment(null);
-            localStorage.removeItem('latestAppointment');
-          }}
+          onClose={() => setLatestAppointment(null)}
         />
       )}
     </div>
   );
 }
-
-export default App;
