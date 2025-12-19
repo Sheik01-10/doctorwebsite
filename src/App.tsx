@@ -22,7 +22,6 @@ interface Appointment {
   date: string;
   time: string;
   doctor: string;
-  reason?: string;
 }
 
 export default function App() {

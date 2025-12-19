@@ -1,83 +1,54 @@
 import { X, Calendar, Clock, User, Phone } from 'lucide-react';
 import { useState } from 'react';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import {
+  addDoc,
+  collection,
+  serverTimestamp,
+  query,
+  where,
+  getDocs,
+} from 'firebase/firestore';
 import { db } from '../firebase';
 
-interface AppointmentData {
+/* ================= TYPES ================= */
+
+export interface AppointmentData {
   name: string;
   phone: string;
   date: string;
   time: string;
   doctor: string;
-  reason?: string;
+  queueNumber: number;
+  status: 'Pending' | 'In Progress' | 'Completed';
 }
 
 interface AppointmentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onBooked: (data: AppointmentData) => void; // 🔥 popup trigger
+  onBooked: (data: AppointmentData) => void;
 }
+
+/* ================= COMPONENT ================= */
 
 export default function AppointmentModal({
   isOpen,
   onClose,
   onBooked,
 }: AppointmentModalProps) {
-  const [formData, setFormData] = useState<AppointmentData>({
+  const [formData, setFormData] = useState({
     name: '',
     phone: '',
     date: '',
     time: '',
     doctor: 'Dr. Saravanan',
-    reason: '',
   });
 
-  const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
   if (!isOpen) return null;
 
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      phone: '',
-      date: '',
-      time: '',
-      doctor: 'Dr. Saravanan',
-      reason: '',
-    });
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (loading) return;
-
-    setLoading(true);
-
-    try {
-      // 🔥 SAVE TO FIRESTORE
-      await addDoc(collection(db, 'appointments'), {
-        ...formData,
-        createdAt: serverTimestamp(),
-        status: 'Pending',
-      });
-
-      // 🔥 Trigger success popup in home
-      onBooked(formData);
-
-      setSubmitted(true);
-
-      setTimeout(() => {
-        setSubmitted(false);
-        resetForm();
-        onClose();
-      }, 1200);
-    } catch (error) {
-      alert('Something went wrong. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  /* ================= HANDLERS ================= */
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -88,21 +59,91 @@ export default function AppointmentModal({
     });
   };
 
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      phone: '',
+      date: '',
+      time: '',
+      doctor: 'Dr. Saravanan',
+    });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (loading) return;
+
+    setLoading(true);
+
+    try {
+      /* 🔒 1. CHECK SLOT AVAILABILITY */
+      const slotQuery = query(
+        collection(db, 'appointments'),
+        where('date', '==', formData.date),
+        where('time', '==', formData.time)
+      );
+
+      const slotSnap = await getDocs(slotQuery);
+
+      if (!slotSnap.empty) {
+        alert('❌ This time slot is already booked. Please choose another.');
+        setLoading(false);
+        return;
+      }
+
+      /* 🔢 2. GENERATE QUEUE NUMBER (DATE BASED) */
+      const queueQuery = query(
+        collection(db, 'appointments'),
+        where('date', '==', formData.date)
+      );
+
+      const queueSnap = await getDocs(queueQuery);
+      const queueNumber = queueSnap.size + 1;
+
+      /* ✅ 3. SAVE TO FIRESTORE */
+      const appointment: AppointmentData = {
+        ...formData,
+        queueNumber,
+        status: 'Pending',
+      };
+
+      await addDoc(collection(db, 'appointments'), {
+        ...appointment,
+        createdAt: serverTimestamp(),
+      });
+
+      /* 🔥 4. TRIGGER SUCCESS POPUP */
+      onBooked(appointment);
+
+      setSubmitted(true);
+
+      setTimeout(() => {
+        setSubmitted(false);
+        resetForm();
+        onClose();
+      }, 1200);
+    } catch (err) {
+      alert('❌ Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /* ================= UI ================= */
+
   return (
     <div
       className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
-      onClick={onClose} // backdrop close
+      onClick={onClose}
     >
       <div
         className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()} // prevent close on modal click
+        onClick={(e) => e.stopPropagation()}
       >
         {/* HEADER */}
         <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
-          <h2 className="text-2xl font-bold text-gray-900">
-            Book Appointment
-          </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <h2 className="text-2xl font-bold">Book Appointment</h2>
+          <button onClick={onClose}>
             <X size={24} />
           </button>
         </div>
@@ -113,10 +154,10 @@ export default function AppointmentModal({
             <div className="bg-green-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
               <Calendar size={40} className="text-green-600" />
             </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">
+            <h3 className="text-2xl font-bold mb-2">
               Appointment Booked!
             </h3>
-            <p className="text-gray-600 text-lg">
+            <p className="text-gray-600">
               Please wait while we confirm your appointment.
             </p>
           </div>
@@ -129,7 +170,6 @@ export default function AppointmentModal({
                   <User size={16} className="inline mr-1" /> Full Name
                 </label>
                 <input
-                  type="text"
                   name="name"
                   value={formData.name}
                   onChange={handleChange}
@@ -143,7 +183,6 @@ export default function AppointmentModal({
                   <Phone size={16} className="inline mr-1" /> Phone Number
                 </label>
                 <input
-                  type="tel"
                   name="phone"
                   value={formData.phone}
                   onChange={handleChange}
@@ -181,9 +220,18 @@ export default function AppointmentModal({
                   className="w-full px-4 py-3 border rounded-lg"
                 >
                   <option value="">Select time</option>
-                  <option value="07:00 PM">07:00 PM</option>
-                  <option value="08:00 PM">08:00 PM</option>
-                  <option value="09:00 PM">09:00 PM</option>
+                  <option>07:00 PM</option>
+                  <option>07:10 PM</option>
+                  <option>07:20 PM</option>
+                  <option>07:30 PM</option>
+                  <option>07:40 PM</option>
+                  <option>07:50 PM</option>
+                  <option>08:00 PM</option>
+                  <option>08:10 PM</option>
+                  <option>08:20 PM</option>
+                  <option>08:30 PM</option>
+                  <option>08:40 PM</option>
+                  <option>08:50 PM</option>
                 </select>
               </div>
             </div>
