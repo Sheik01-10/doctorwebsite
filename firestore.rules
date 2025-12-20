@@ -1,0 +1,17 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /appointments/{appointmentId} {
+
+      // ✅ Anyone can CREATE appointment (patients)
+      allow create: if true;
+
+      // ✅ Anyone can READ queue (patients view queue)
+      allow read: if true;
+
+      // 🔐 Only admin (logged in) can UPDATE / DELETE
+      allow update, delete: if request.auth != null;
+    }
+  }
+}
