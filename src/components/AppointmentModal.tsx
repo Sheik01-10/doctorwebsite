@@ -1,5 +1,7 @@
 import { X, Calendar, Clock, User, Phone } from 'lucide-react';
 import { useState } from 'react';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 import {
   addDoc,
   collection,
@@ -197,15 +199,22 @@ export default function AppointmentModal({
                 <label className="block text-sm font-semibold mb-2">
                   <Calendar size={16} className="inline mr-1" /> Date
                 </label>
-                <input
-                  type="date"
-                  name="date"
-                  value={formData.date}
-                  onChange={handleChange}
-                  required
-                  min={new Date().toISOString().split('T')[0]}
-                  className="w-full px-4 py-3 border rounded-lg"
-                />
+              <DatePicker
+  selected={formData.date ? new Date(formData.date) : null}
+  onChange={(date: Date | null) =>
+    setFormData({
+      ...formData,
+      date: date
+        ? date.toISOString().split('T')[0] // ✅ YYYY-MM-DD
+        : '',
+    })
+  }
+  dateFormat="dd/MM/yyyy"          // 👁 UI FORMAT
+  minDate={new Date()}
+  placeholderText="DD / MM / YYYY"
+  className="w-full px-4 py-3 border rounded-lg"
+/>
+
               </div>
 
               <div>
