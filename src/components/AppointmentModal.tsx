@@ -56,7 +56,7 @@ export default function AppointmentModal({
   onClose,
   onBooked,
 }: AppointmentModalProps) {
-  /* 🔒 ALL HOOKS AT TOP (NO WHITE SCREEN) */
+  /* 🔒 STATES (ALL AT TOP) */
 
   const [formData, setFormData] = useState({
     name: '',
@@ -91,8 +91,7 @@ export default function AppointmentModal({
         } else {
           setIsOnLeave(false);
         }
-      } catch (err) {
-        console.error('Doctor status error', err);
+      } catch {
         setIsOnLeave(false);
       }
     };
@@ -109,18 +108,12 @@ export default function AppointmentModal({
     }
 
     const fetchBookedTimes = async () => {
-      try {
-        const q = query(
-          collection(db, 'appointments'),
-          where('date', '==', formData.date)
-        );
-
-        const snap = await getDocs(q);
-        setBookedTimes(snap.docs.map((d) => d.data().time));
-      } catch (err) {
-        console.error('Booked times error', err);
-        setBookedTimes([]);
-      }
+      const q = query(
+        collection(db, 'appointments'),
+        where('date', '==', formData.date)
+      );
+      const snap = await getDocs(q);
+      setBookedTimes(snap.docs.map((d) => d.data().time));
     };
 
     fetchBookedTimes();
@@ -145,6 +138,8 @@ export default function AppointmentModal({
     setBookedTimes([]);
   };
 
+  /* ================= SUBMIT ================= */
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading || isOnLeave) return;
@@ -152,29 +147,56 @@ export default function AppointmentModal({
     setLoading(true);
 
     try {
-      /* SAFETY SLOT CHECK */
+      /* 🔴 1. PHONE DUPLICATE CHECK (GLOBAL) */
+      const phoneQ = query(
+        collection(db, 'appointments'),
+        where('phone', '==', formData.phone)
+      );
+      const phoneSnap = await getDocs(phoneQ);
+
+      if (!phoneSnap.empty) {
+        alert('❌ This phone number is already registered');
+        setLoading(false);
+        return;
+      }
+
+      /* 🔴 2. NAME DUPLICATE CHECK (SAME DATE) */
+      const nameQ = query(
+        collection(db, 'appointments'),
+        where('name', '==', formData.name),
+        where('date', '==', formData.date)
+      );
+      const nameSnap = await getDocs(nameQ);
+
+      if (!nameSnap.empty) {
+        alert('❌ This name is already registered for today');
+        setLoading(false);
+        return;
+      }
+
+      /* 🔒 3. SLOT CHECK */
       const slotQ = query(
         collection(db, 'appointments'),
         where('date', '==', formData.date),
         where('time', '==', formData.time)
       );
-
       const slotSnap = await getDocs(slotQ);
+
       if (!slotSnap.empty) {
         alert('❌ This time slot is already booked');
         setLoading(false);
         return;
       }
 
-      /* QUEUE NUMBER */
+      /* 🔢 4. QUEUE NUMBER */
       const queueQ = query(
         collection(db, 'appointments'),
         where('date', '==', formData.date)
       );
-
       const queueSnap = await getDocs(queueQ);
       const queueNumber = queueSnap.size + 1;
 
+      /* ✅ 5. SAVE */
       const appointment: AppointmentData = {
         ...formData,
         queueNumber,
@@ -194,15 +216,14 @@ export default function AppointmentModal({
         resetForm();
         onClose();
       }, 1200);
-    } catch (err) {
-      console.error(err);
-      alert('❌ Something went wrong');
+    } catch {
+      alert('❌ Something went wrong. Try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  /* 🔒 SAFE RETURN AFTER HOOKS */
+  /* 🔒 SAFE RETURN */
   if (!isOpen) return null;
 
   /* ================= UI ================= */
@@ -228,10 +249,10 @@ export default function AppointmentModal({
         {isOnLeave ? (
           <div className="p-10 text-center">
             <Calendar size={48} className="mx-auto text-red-500 mb-4" />
-            <h3 className="text-2xl font-bold text-red-600 mb-2">
+            <h3 className="text-2xl font-bold text-red-600">
               Doctor Unavailable
             </h3>
-            <p className="text-gray-700 text-lg">{leaveMessage}</p>
+            <p className="text-gray-700">{leaveMessage}</p>
           </div>
         ) : submitted ? (
           <div className="p-8 text-center">
@@ -241,7 +262,6 @@ export default function AppointmentModal({
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="p-6 space-y-6">
-            {/* NAME & PHONE */}
             <div className="grid md:grid-cols-2 gap-6">
               <input
                 name="name"
@@ -261,24 +281,30 @@ export default function AppointmentModal({
               />
             </div>
 
-            {/* DATE & TIME */}
             <div className="grid md:grid-cols-2 gap-6">
-              <DatePicker
-                selected={formData.date ? new Date(formData.date) : null}
-                onChange={(date: Date | null) =>
-                  setFormData({
-                    ...formData,
-                    date: date
-                      ? date.toISOString().split('T')[0]
-                      : '',
-                    time: '',
-                  })
-                }
-                dateFormat="dd/MM/yyyy"
-                minDate={new Date()}
-                placeholderText="DD / MM / YYYY"
-                className="border p-3 rounded-lg w-full"
-              />
+             <DatePicker
+  selected={formData.date ? new Date(formData.date) : null}
+  onChange={(date: Date | null) => {
+    if (!date) return;
+
+    // 🔴 SUNDAY CHECK
+    if (date.getDay() === 0) {
+      alert('❌ Sunday is a holiday. Please select another date.');
+      return;
+    }
+
+    setFormData({
+      ...formData,
+      date: date.toISOString().split('T')[0],
+      time: '',
+    });
+  }}
+  filterDate={(date: Date) => date.getDay() !== 0} // ❌ Disable Sundays
+  dateFormat="dd/MM/yyyy"
+  minDate={new Date()}
+  placeholderText="DD / MM / YYYY"
+  className="border p-3 rounded-lg w-full"
+/>
 
               <select
                 name="time"

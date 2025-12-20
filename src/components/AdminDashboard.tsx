@@ -9,9 +9,8 @@ import {
   setDoc,
   updateDoc,
 } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, auth } from '../firebase';
 import { signOut } from 'firebase/auth';
-import { auth } from '../firebase';
 import { useNavigate } from 'react-router-dom';
 
 interface Appointment {
@@ -29,7 +28,7 @@ export default function AdminDashboard() {
   const [leaveMessage, setLeaveMessage] = useState('');
   const navigate = useNavigate();
 
-  /* 🔥 APPOINTMENTS REAL-TIME */
+  /* 🔥 REAL-TIME APPOINTMENTS */
   useEffect(() => {
     const q = query(
       collection(db, 'appointments'),
@@ -78,21 +77,25 @@ export default function AdminDashboard() {
     setIsOnLeave(!isOnLeave);
   };
 
-  /* 🔐 LOGOUT */
+  /* 🔐 LOGOUT BUTTON FUNCTION */
   const handleLogout = async () => {
     await signOut(auth);
-    navigate('/');
+    navigate('/admin/login'); // 👈 back to login
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="bg-gray-50 ">
 
-      {/* TOP BAR */}
-      <div className="bg-white px-6 py-6 flex justify-between items-center shadow">
-        <h1 className="text-2xl font-bold">Admin Dashboard</h1>
+      {/* 🔝 TOP BAR */}
+      <div className="bg-white px-6 py-20 flex justify-between items-center shadow">
+        <h1 className="text-2xl font-bold text-gray-800">
+          Admin Dashboard
+        </h1>
+
+        {/* 🔴 LOGOUT BUTTON */}
         <button
           onClick={handleLogout}
-          className="bg-red-600 text-white px-4 py-2 rounded-lg"
+          className="bg-red-600 hover:bg-red-700 text-white px-9 py-2 rounded-lg font-semibold"
         >
           Logout
         </button>
@@ -101,17 +104,13 @@ export default function AdminDashboard() {
       {/* CONTENT */}
       <div className="p-6 max-w-6xl mx-auto space-y-8">
 
-        {/* 🔴 DOCTOR LEAVE TOGGLE */}
+        {/* DOCTOR LEAVE */}
         <div className="bg-white p-6 rounded-xl shadow border">
           <h2 className="text-xl font-bold mb-4">
             Doctor Availability
           </h2>
 
           <div className="flex items-center gap-4 mb-4">
-            <span className="font-semibold">
-              Status:
-            </span>
-
             <span
               className={`px-4 py-1 rounded-full text-sm font-bold ${
                 isOnLeave
@@ -141,13 +140,9 @@ export default function AdminDashboard() {
             placeholder="Leave message"
             className="w-full border px-4 py-2 rounded-lg"
           />
-
-          <p className="text-sm text-gray-500 mt-2">
-            This message will be shown to patients
-          </p>
         </div>
 
-        {/* 📋 APPOINTMENTS */}
+        {/* APPOINTMENTS */}
         <div>
           <h2 className="text-xl font-semibold mb-4">
             Appointments (Live)
