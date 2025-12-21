@@ -102,7 +102,7 @@ export default function AdminDashboard() {
     <div className="bg-gray-50 min-h-screen">
 
       {/* TOP BAR */}
-      <div className="bg-white px-6 py-6 flex justify-between items-center shadow">
+      <div className="bg-white px-6 py-24 flex justify-between items-center shadow">
         <h1 className="text-2xl font-bold text-gray-800">
           Admin Dashboard
         </h1>

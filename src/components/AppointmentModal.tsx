@@ -30,7 +30,7 @@ export interface AppointmentData {
   time: string;
   doctor: string;
   queueNumber: number;
-  status: 'Pending' | 'In Progress' | 'Completed';
+  status: 'Pending' | 'In Progress' | 'Completed' | 'Cancelled';
 }
 
 interface AppointmentModalProps {
@@ -71,7 +71,7 @@ export default function AppointmentModal({
   const [isOnLeave, setIsOnLeave] = useState(false);
   const [leaveMessage, setLeaveMessage] = useState('');
 
-  /* 🔄 RESET STATE WHEN MODAL OPENS (🔥 MAIN FIX) */
+  /* 🔄 RESET STATE WHEN MODAL OPENS */
   useEffect(() => {
     if (isOpen) {
       setSubmitted(false);
@@ -89,7 +89,7 @@ export default function AppointmentModal({
     }
   }, [isOpen]);
 
-  /* ================= CHECK LEAVE WHEN DATE CHANGES ================= */
+  /* ================= CHECK DOCTOR LEAVE ================= */
 
   useEffect(() => {
     if (!formData.date) {
@@ -107,7 +107,7 @@ export default function AppointmentModal({
     checkLeave();
   }, [formData.date]);
 
-  /* ================= FETCH BOOKED TIMES ================= */
+  /* ================= FETCH BOOKED TIMES (🔥 FINAL FIX) ================= */
 
   useEffect(() => {
     if (!formData.date || isOnLeave) {
@@ -118,8 +118,10 @@ export default function AppointmentModal({
     const fetchBookedTimes = async () => {
       const q = query(
         collection(db, 'appointments'),
-        where('date', '==', formData.date)
+        where('date', '==', formData.date),
+        where('status', 'in', ['Pending', 'In Progress']) // ✅ ONLY ACTIVE
       );
+
       const snap = await getDocs(q);
       setBookedTimes(snap.docs.map((d) => d.data().time));
     };
@@ -136,48 +138,52 @@ export default function AppointmentModal({
     setLoading(true);
 
     try {
-      /* 🔴 1. PHONE DUPLICATE (SAME DATE ONLY) */
+      /* 🔴 PHONE DUPLICATE (SAME DATE) */
       const phoneQ = query(
         collection(db, 'appointments'),
         where('phone', '==', formData.phone),
-        where('date', '==', formData.date)
+        where('date', '==', formData.date),
+        where('status', 'in', ['Pending', 'In Progress'])
       );
       if (!(await getDocs(phoneQ)).empty) {
         alert('❌ This phone number is already booked for this date');
         return;
       }
 
-      /* 🔴 2. NAME DUPLICATE (SAME DATE ONLY) */
+      /* 🔴 NAME DUPLICATE (SAME DATE) */
       const nameQ = query(
         collection(db, 'appointments'),
         where('name', '==', formData.name),
-        where('date', '==', formData.date)
+        where('date', '==', formData.date),
+        where('status', 'in', ['Pending', 'In Progress'])
       );
       if (!(await getDocs(nameQ)).empty) {
         alert('❌ This name is already booked for this date');
         return;
       }
 
-      /* 🔴 3. SLOT DUPLICATE */
+      /* 🔴 SLOT DUPLICATE (🔥 FINAL FIX) */
       const slotQ = query(
         collection(db, 'appointments'),
         where('date', '==', formData.date),
-        where('time', '==', formData.time)
+        where('time', '==', formData.time),
+        where('status', 'in', ['Pending', 'In Progress'])
       );
       if (!(await getDocs(slotQ)).empty) {
         alert('❌ This time slot is already booked');
         return;
       }
 
-      /* 🔢 4. QUEUE NUMBER */
+      /* 🔢 QUEUE NUMBER (ONLY ACTIVE) */
       const queueQ = query(
         collection(db, 'appointments'),
-        where('date', '==', formData.date)
+        where('date', '==', formData.date),
+        where('status', 'in', ['Pending', 'In Progress'])
       );
       const queueSnap = await getDocs(queueQ);
       const queueNumber = queueSnap.size + 1;
 
-      /* ✅ 5. SAVE */
+      /* ✅ SAVE */
       const appointment: AppointmentData = {
         ...formData,
         queueNumber,
@@ -206,21 +212,14 @@ export default function AppointmentModal({
   /* ================= UI ================= */
 
   return (
-    <div
-      className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-white rounded-2xl max-w-2xl w-full"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl max-w-2xl w-full">
         {/* HEADER */}
         <div className="border-b px-6 py-4 flex justify-between items-center">
           <h2 className="text-2xl font-bold">Book Appointment</h2>
           <button onClick={onClose}><X size={24} /></button>
         </div>
 
-        {/* ❌ LEAVE BLOCK */}
         {isOnLeave ? (
           <div className="p-10 text-center">
             <Calendar size={48} className="mx-auto text-red-500 mb-4" />
