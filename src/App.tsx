@@ -7,7 +7,6 @@ import About from './components/About';
 import Doctors from './components/Doctors';
 import Location from './components/Location';
 import AppointmentModal from './components/AppointmentModal';
-import QueueModal from './components/QueueModal';
 import AppointmentPopup from './components/AppointmentPopup';
 
 // ADMIN
@@ -26,7 +25,6 @@ interface Appointment {
 
 export default function App() {
   const [isAppointmentModalOpen, setIsAppointmentModalOpen] = useState(false);
-  const [isQueueModalOpen, setIsQueueModalOpen] = useState(false);
   const [latestAppointment, setLatestAppointment] =
     useState<Appointment | null>(null);
 
@@ -42,7 +40,6 @@ export default function App() {
             <>
               <Hero
                 onGetAppointment={() => setIsAppointmentModalOpen(true)}
-                onViewQueue={() => setIsQueueModalOpen(true)}
               />
               <About />
               <Doctors />
@@ -89,10 +86,6 @@ export default function App() {
         onBooked={(data: Appointment) => setLatestAppointment(data)}
       />
 
-      <QueueModal
-        isOpen={isQueueModalOpen}
-        onClose={() => setIsQueueModalOpen(false)}
-      />
 
       {/* ✅ SUCCESS POPUP */}
       {latestAppointment && (

@@ -7,6 +7,7 @@ import {
   doc,
   setDoc,
   deleteDoc,
+  updateDoc,
 } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { signOut } from 'firebase/auth';
@@ -75,14 +76,20 @@ export default function AdminDashboard() {
     setLeaveMessage('');
   };
 
-  /* ❌ REMOVE LEAVE (🔥 NEW FEATURE) */
+  /* ❌ REMOVE LEAVE */
   const removeLeave = async (date: string) => {
-    const ok = confirm(
-      `Doctor is available on ${date}. Remove leave?`
-    );
+    if (!confirm(`Remove leave for ${date}?`)) return;
+    await deleteDoc(doc(db, 'doctor_leaves', date));
+  };
+
+  /* ❌ CANCEL APPOINTMENT (🔥 NEW) */
+  const cancelAppointment = async (id: string, name: string) => {
+    const ok = confirm(`Cancel appointment for ${name}?`);
     if (!ok) return;
 
-    await deleteDoc(doc(db, 'doctor_leaves', date));
+    await updateDoc(doc(db, 'appointments', id), {
+      status: 'Cancelled',
+    });
   };
 
   /* 🔐 LOGOUT */
@@ -95,8 +102,8 @@ export default function AdminDashboard() {
     <div className="bg-gray-50 min-h-screen">
 
       {/* TOP BAR */}
-      <div className="bg-white px-6 py-8 flex justify-between items-center shadow">
-        <h1 className=" py-14 text-2xl font-bold text-gray-800">
+      <div className="bg-white px-6 py-6 flex justify-between items-center shadow">
+        <h1 className="text-2xl font-bold text-gray-800">
           Admin Dashboard
         </h1>
 
@@ -141,36 +148,26 @@ export default function AdminDashboard() {
             </button>
           </div>
 
-          {/* 📅 LEAVE LIST */}
           {leaveDates.length > 0 && (
-            <div>
-              <h3 className="font-semibold mb-2">Leave Dates</h3>
-
-              <div className="flex flex-wrap gap-2">
-                {leaveDates.map((d) => (
-                  <div
-                    key={d}
-                    className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm font-bold ${
-                      isSunday(d)
-                        ? 'bg-red-200 text-red-700'
-                        : 'bg-gray-200 text-gray-700'
-                    }`}
+            <div className="flex flex-wrap gap-2">
+              {leaveDates.map((d) => (
+                <div
+                  key={d}
+                  className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm font-bold ${
+                    isSunday(d)
+                      ? 'bg-red-200 text-red-700'
+                      : 'bg-gray-200 text-gray-700'
+                  }`}
+                >
+                  <span>{d}</span>
+                  <button
+                    onClick={() => removeLeave(d)}
+                    className="bg-black text-white px-2 rounded text-xs"
                   >
-                    <span>
-                      {d} {isSunday(d) && '(Sunday)'}
-                    </span>
-
-                    {/* ❌ REMOVE BUTTON */}
-                    <button
-                      onClick={() => removeLeave(d)}
-                      className="bg-black text-white px-2 rounded text-xs"
-                      title="Remove Leave"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
-              </div>
+                    ✕
+                  </button>
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -195,9 +192,24 @@ export default function AdminDashboard() {
                   <p><b>Date:</b> {a.date}</p>
                   <p><b>Time:</b> {a.time}</p>
 
-                  <span className="text-orange-600 font-semibold">
-                    Status: Pending
+                  <span
+                    className={`font-semibold ${
+                      a.status === 'Cancelled'
+                        ? 'text-red-600'
+                        : 'text-orange-600'
+                    }`}
+                  >
+                    Status: {a.status || 'Pending'}
                   </span>
+
+                  {a.status !== 'Cancelled' && (
+                    <button
+                      onClick={() => cancelAppointment(a.id, a.name)}
+                      className="mt-3 w-full bg-red-600 text-white py-2 rounded-lg font-semibold"
+                    >
+                      Cancel Appointment
+                    </button>
+                  )}
                 </div>
               ))}
             </div>

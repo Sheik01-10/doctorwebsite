@@ -90,13 +90,16 @@ export default function Location() {
           {/* Map */}
           <div className="w-full h-[300px] rounded-xl overflow-hidden shadow-lg relative">
   <iframe
-    src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2779.3475908045616!2d77.00258529999999!3d10.994646999999999!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3ba859d4d58cd25b%3A0xd573ed0efc23370c!2s2nd%20St%2C%20Kongu%20Nagar%2C%20Kallimadai%2C%20Coimbatore%2C%20Tamil%20Nadu!5e1!3m2!1sen!2sin!4v1766165452879!5m2!1sen!2sin"
-    className="absolute inset-0 w-full h-full"
-    style={{ border: 0 }}
-    allowFullScreen
-    loading="lazy"
-    referrerPolicy="no-referrer-when-downgrade"
-  ></iframe>
+  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2779.328235400636!2d77.00153257310033!3d10.996700555096034!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3ba859c4848a3cb7%3A0x3629edcd10d4ac15!2sShanmuga%20Diabetic%20Clinic!5e1!3m2!1sen!2sin!4v1766305474189!5m2!1sen!2sin"
+  width="100%"
+  height="450"
+  style={{ border: 0 }}
+  allowFullScreen
+  loading="lazy"
+  referrerPolicy="no-referrer-when-downgrade"
+  className="rounded-xl shadow-md"
+/>
+
 </div>
 
 

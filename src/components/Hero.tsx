@@ -1,12 +1,11 @@
-import { Calendar, Users, MessageCircle } from 'lucide-react';
+import { Calendar, MessageCircle } from 'lucide-react';
 import logo from '../assets/logo.png';
 
 interface HeroProps {
   onGetAppointment: () => void;
-  onViewQueue: () => void;
 }
 
-export default function Hero({ onGetAppointment, onViewQueue }: HeroProps) {
+export default function Hero({ onGetAppointment, }: HeroProps) {
   return (
     <section
       id="home"
@@ -61,14 +60,6 @@ export default function Hero({ onGetAppointment, onViewQueue }: HeroProps) {
               >
                 <Calendar size={20} />
                 Get Appointment
-              </button>
-
-              <button
-                onClick={onViewQueue}
-                className="w-full sm:w-auto flex items-center justify-center gap-2 bg-white text-blue-600 px-8 py-4 rounded-xl font-semibold hover:bg-gray-50 transition shadow-lg border-2 border-blue-600"
-              >
-                <Users size={20} />
-                View Queue
               </button>
             </div>
 
