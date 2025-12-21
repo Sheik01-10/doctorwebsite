@@ -5,9 +5,8 @@ import {
   query,
   orderBy,
   doc,
-  getDoc,
   setDoc,
-  updateDoc,
+  deleteDoc,
 } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { signOut } from 'firebase/auth';
@@ -22,80 +21,88 @@ interface Appointment {
   status?: string;
 }
 
+/* 🔴 Sunday check */
+const isSunday = (dateStr: string) => {
+  return new Date(dateStr).getDay() === 0;
+};
+
 export default function AdminDashboard() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [isOnLeave, setIsOnLeave] = useState(false);
+  const [leaveDate, setLeaveDate] = useState('');
   const [leaveMessage, setLeaveMessage] = useState('');
+  const [leaveDates, setLeaveDates] = useState<string[]>([]);
   const navigate = useNavigate();
 
-  /* 🔥 REAL-TIME APPOINTMENTS */
+  /* 🔥 LIVE APPOINTMENTS */
   useEffect(() => {
     const q = query(
       collection(db, 'appointments'),
       orderBy('createdAt', 'desc')
     );
-
-    const unsub = onSnapshot(q, (snapshot) => {
+    const unsub = onSnapshot(q, (snap) => {
       setAppointments(
-        snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...(doc.data() as Omit<Appointment, 'id'>),
+        snap.docs.map((d) => ({
+          id: d.id,
+          ...(d.data() as Omit<Appointment, 'id'>),
         }))
       );
     });
-
     return () => unsub();
   }, []);
 
-  /* 🔥 LOAD DOCTOR LEAVE STATUS */
+  /* 🔥 LOAD LEAVE DATES */
   useEffect(() => {
-    const loadLeaveStatus = async () => {
-      const ref = doc(db, 'doctor_status', 'today');
-      const snap = await getDoc(ref);
-
-      if (snap.exists()) {
-        setIsOnLeave(snap.data().isOnLeave);
-        setLeaveMessage(snap.data().message || '');
-      } else {
-        await setDoc(ref, {
-          isOnLeave: false,
-          message: 'Doctor is on leave today',
-        });
-      }
-    };
-
-    loadLeaveStatus();
+    const unsub = onSnapshot(collection(db, 'doctor_leaves'), (snap) => {
+      setLeaveDates(snap.docs.map((d) => d.id));
+    });
+    return () => unsub();
   }, []);
 
-  /* 🔁 TOGGLE LEAVE */
-  const toggleLeave = async () => {
-    const ref = doc(db, 'doctor_status', 'today');
-    await updateDoc(ref, {
-      isOnLeave: !isOnLeave,
-      message: leaveMessage || 'Doctor is on leave today',
+  /* ➕ SET LEAVE */
+  const setDoctorLeave = async () => {
+    if (!leaveDate) {
+      alert('Select a date');
+      return;
+    }
+
+    await setDoc(doc(db, 'doctor_leaves', leaveDate), {
+      date: leaveDate,
+      message: leaveMessage || 'Doctor on leave',
+      createdAt: new Date(),
     });
-    setIsOnLeave(!isOnLeave);
+
+    setLeaveDate('');
+    setLeaveMessage('');
   };
 
-  /* 🔐 LOGOUT BUTTON FUNCTION */
+  /* ❌ REMOVE LEAVE (🔥 NEW FEATURE) */
+  const removeLeave = async (date: string) => {
+    const ok = confirm(
+      `Doctor is available on ${date}. Remove leave?`
+    );
+    if (!ok) return;
+
+    await deleteDoc(doc(db, 'doctor_leaves', date));
+  };
+
+  /* 🔐 LOGOUT */
   const handleLogout = async () => {
     await signOut(auth);
-    navigate('/admin/login'); // 👈 back to login
+    navigate('/admin/login');
   };
 
   return (
-    <div className="bg-gray-50 ">
+    <div className="bg-gray-50 min-h-screen">
 
-      {/* 🔝 TOP BAR */}
-      <div className="bg-white px-6 py-20 flex justify-between items-center shadow">
-        <h1 className="text-2xl font-bold text-gray-800">
+      {/* TOP BAR */}
+      <div className="bg-white px-6 py-8 flex justify-between items-center shadow">
+        <h1 className=" py-14 text-2xl font-bold text-gray-800">
           Admin Dashboard
         </h1>
 
-        {/* 🔴 LOGOUT BUTTON */}
         <button
           onClick={handleLogout}
-          className="bg-red-600 hover:bg-red-700 text-white px-9 py-2 rounded-lg font-semibold"
+          className="bg-red-600 text-white px-6 py-2 rounded-lg font-semibold"
         >
           Logout
         </button>
@@ -104,52 +111,78 @@ export default function AdminDashboard() {
       {/* CONTENT */}
       <div className="p-6 max-w-6xl mx-auto space-y-8">
 
-        {/* DOCTOR LEAVE */}
+        {/* 🩺 DOCTOR LEAVE */}
         <div className="bg-white p-6 rounded-xl shadow border">
           <h2 className="text-xl font-bold mb-4">
-            Doctor Availability
+            Doctor Leave (Date Based)
           </h2>
 
-          <div className="flex items-center gap-4 mb-4">
-            <span
-              className={`px-4 py-1 rounded-full text-sm font-bold ${
-                isOnLeave
-                  ? 'bg-red-100 text-red-600'
-                  : 'bg-green-100 text-green-600'
-              }`}
-            >
-              {isOnLeave ? 'ON LEAVE' : 'AVAILABLE'}
-            </span>
+          <div className="grid md:grid-cols-3 gap-4 mb-4">
+            <input
+              type="date"
+              value={leaveDate}
+              onChange={(e) => setLeaveDate(e.target.value)}
+              className="border px-4 py-2 rounded-lg"
+            />
+
+            <input
+              type="text"
+              value={leaveMessage}
+              onChange={(e) => setLeaveMessage(e.target.value)}
+              placeholder="Leave message (optional)"
+              className="border px-4 py-2 rounded-lg"
+            />
 
             <button
-              onClick={toggleLeave}
-              className={`px-4 py-2 rounded-lg font-semibold ${
-                isOnLeave
-                  ? 'bg-green-600 text-white'
-                  : 'bg-red-600 text-white'
-              }`}
+              onClick={setDoctorLeave}
+              className="bg-red-600 text-white rounded-lg font-semibold"
             >
-              {isOnLeave ? 'Set Available' : 'Set Leave'}
+              Set Leave
             </button>
           </div>
 
-          <input
-            type="text"
-            value={leaveMessage}
-            onChange={(e) => setLeaveMessage(e.target.value)}
-            placeholder="Leave message"
-            className="w-full border px-4 py-2 rounded-lg"
-          />
+          {/* 📅 LEAVE LIST */}
+          {leaveDates.length > 0 && (
+            <div>
+              <h3 className="font-semibold mb-2">Leave Dates</h3>
+
+              <div className="flex flex-wrap gap-2">
+                {leaveDates.map((d) => (
+                  <div
+                    key={d}
+                    className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm font-bold ${
+                      isSunday(d)
+                        ? 'bg-red-200 text-red-700'
+                        : 'bg-gray-200 text-gray-700'
+                    }`}
+                  >
+                    <span>
+                      {d} {isSunday(d) && '(Sunday)'}
+                    </span>
+
+                    {/* ❌ REMOVE BUTTON */}
+                    <button
+                      onClick={() => removeLeave(d)}
+                      className="bg-black text-white px-2 rounded text-xs"
+                      title="Remove Leave"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* APPOINTMENTS */}
+        {/* 📋 APPOINTMENTS */}
         <div>
           <h2 className="text-xl font-semibold mb-4">
             Appointments (Live)
           </h2>
 
           {appointments.length === 0 ? (
-            <p className="text-gray-600">No appointments yet.</p>
+            <p>No appointments yet.</p>
           ) : (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
               {appointments.map((a) => (
@@ -162,7 +195,7 @@ export default function AdminDashboard() {
                   <p><b>Date:</b> {a.date}</p>
                   <p><b>Time:</b> {a.time}</p>
 
-                  <span className="inline-block mt-2 text-sm font-semibold text-orange-600">
+                  <span className="text-orange-600 font-semibold">
                     Status: Pending
                   </span>
                 </div>

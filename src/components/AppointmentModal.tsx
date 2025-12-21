@@ -17,18 +17,8 @@ import { db } from '../firebase';
 /* ================= CONSTANTS ================= */
 
 const ALL_TIME_SLOTS = [
-  '07:00 PM',
-  '07:10 PM',
-  '07:20 PM',
-  '07:30 PM',
-  '07:40 PM',
-  '07:50 PM',
-  '08:00 PM',
-  '08:10 PM',
-  '08:20 PM',
-  '08:30 PM',
-  '08:40 PM',
-  '08:50 PM',
+  '07:00 PM','07:10 PM','07:20 PM','07:30 PM','07:40 PM','07:50 PM',
+  '08:00 PM','08:10 PM','08:20 PM','08:30 PM','08:40 PM','08:50 PM',
 ];
 
 /* ================= TYPES ================= */
@@ -49,6 +39,15 @@ interface AppointmentModalProps {
   onBooked: (data: AppointmentData) => void;
 }
 
+/* ================= HELPERS ================= */
+
+const isSunday = (date: Date) => date.getDay() === 0;
+
+const isDoctorOnLeave = async (dateStr: string) => {
+  const snap = await getDoc(doc(db, 'doctor_leaves', dateStr));
+  return snap.exists();
+};
+
 /* ================= COMPONENT ================= */
 
 export default function AppointmentModal({
@@ -56,7 +55,6 @@ export default function AppointmentModal({
   onClose,
   onBooked,
 }: AppointmentModalProps) {
-  /* 🔒 STATES (ALL AT TOP) */
 
   const [formData, setFormData] = useState({
     name: '',
@@ -73,31 +71,41 @@ export default function AppointmentModal({
   const [isOnLeave, setIsOnLeave] = useState(false);
   const [leaveMessage, setLeaveMessage] = useState('');
 
-  /* ================= DOCTOR LEAVE CHECK ================= */
+  /* 🔄 RESET STATE WHEN MODAL OPENS (🔥 MAIN FIX) */
+  useEffect(() => {
+    if (isOpen) {
+      setSubmitted(false);
+      setLoading(false);
+      setBookedTimes([]);
+      setIsOnLeave(false);
+      setLeaveMessage('');
+      setFormData({
+        name: '',
+        phone: '',
+        date: '',
+        time: '',
+        doctor: 'Dr. Saravanan',
+      });
+    }
+  }, [isOpen]);
+
+  /* ================= CHECK LEAVE WHEN DATE CHANGES ================= */
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!formData.date) {
+      setIsOnLeave(false);
+      setLeaveMessage('');
+      return;
+    }
 
-    const checkDoctorStatus = async () => {
-      try {
-        const ref = doc(db, 'doctor_status', 'today');
-        const snap = await getDoc(ref);
-
-        if (snap.exists()) {
-          setIsOnLeave(snap.data().isOnLeave === true);
-          setLeaveMessage(
-            snap.data().message || 'Doctor is on leave today'
-          );
-        } else {
-          setIsOnLeave(false);
-        }
-      } catch {
-        setIsOnLeave(false);
-      }
+    const checkLeave = async () => {
+      const leave = await isDoctorOnLeave(formData.date);
+      setIsOnLeave(leave);
+      setLeaveMessage('Doctor is on leave on this date');
     };
 
-    checkDoctorStatus();
-  }, [isOpen]);
+    checkLeave();
+  }, [formData.date]);
 
   /* ================= FETCH BOOKED TIMES ================= */
 
@@ -119,25 +127,6 @@ export default function AppointmentModal({
     fetchBookedTimes();
   }, [formData.date, isOnLeave]);
 
-  /* ================= HANDLERS ================= */
-
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      phone: '',
-      date: '',
-      time: '',
-      doctor: 'Dr. Saravanan',
-    });
-    setBookedTimes([]);
-  };
-
   /* ================= SUBMIT ================= */
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -147,44 +136,36 @@ export default function AppointmentModal({
     setLoading(true);
 
     try {
-      /* 🔴 1. PHONE DUPLICATE CHECK (GLOBAL) */
+      /* 🔴 1. PHONE DUPLICATE (SAME DATE ONLY) */
       const phoneQ = query(
         collection(db, 'appointments'),
-        where('phone', '==', formData.phone)
+        where('phone', '==', formData.phone),
+        where('date', '==', formData.date)
       );
-      const phoneSnap = await getDocs(phoneQ);
-
-      if (!phoneSnap.empty) {
-        alert('❌ This phone number is already registered');
-        setLoading(false);
+      if (!(await getDocs(phoneQ)).empty) {
+        alert('❌ This phone number is already booked for this date');
         return;
       }
 
-      /* 🔴 2. NAME DUPLICATE CHECK (SAME DATE) */
+      /* 🔴 2. NAME DUPLICATE (SAME DATE ONLY) */
       const nameQ = query(
         collection(db, 'appointments'),
         where('name', '==', formData.name),
         where('date', '==', formData.date)
       );
-      const nameSnap = await getDocs(nameQ);
-
-      if (!nameSnap.empty) {
-        alert('❌ This name is already registered for today');
-        setLoading(false);
+      if (!(await getDocs(nameQ)).empty) {
+        alert('❌ This name is already booked for this date');
         return;
       }
 
-      /* 🔒 3. SLOT CHECK */
+      /* 🔴 3. SLOT DUPLICATE */
       const slotQ = query(
         collection(db, 'appointments'),
         where('date', '==', formData.date),
         where('time', '==', formData.time)
       );
-      const slotSnap = await getDocs(slotQ);
-
-      if (!slotSnap.empty) {
+      if (!(await getDocs(slotQ)).empty) {
         alert('❌ This time slot is already booked');
-        setLoading(false);
         return;
       }
 
@@ -213,17 +194,13 @@ export default function AppointmentModal({
 
       setTimeout(() => {
         setSubmitted(false);
-        resetForm();
         onClose();
       }, 1200);
-    } catch {
-      alert('❌ Something went wrong. Try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  /* 🔒 SAFE RETURN */
   if (!isOpen) return null;
 
   /* ================= UI ================= */
@@ -240,12 +217,10 @@ export default function AppointmentModal({
         {/* HEADER */}
         <div className="border-b px-6 py-4 flex justify-between items-center">
           <h2 className="text-2xl font-bold">Book Appointment</h2>
-          <button onClick={onClose}>
-            <X size={24} />
-          </button>
+          <button onClick={onClose}><X size={24} /></button>
         </div>
 
-        {/* DOCTOR LEAVE */}
+        {/* ❌ LEAVE BLOCK */}
         {isOnLeave ? (
           <div className="p-10 text-center">
             <Calendar size={48} className="mx-auto text-red-500 mb-4" />
@@ -264,53 +239,53 @@ export default function AppointmentModal({
           <form onSubmit={handleSubmit} className="p-6 space-y-6">
             <div className="grid md:grid-cols-2 gap-6">
               <input
-                name="name"
                 placeholder="Full Name"
-                value={formData.name}
-                onChange={handleChange}
                 required
+                value={formData.name}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
                 className="border p-3 rounded-lg"
               />
               <input
-                name="phone"
                 placeholder="Phone Number"
-                value={formData.phone}
-                onChange={handleChange}
                 required
+                value={formData.phone}
+                onChange={(e) =>
+                  setFormData({ ...formData, phone: e.target.value })
+                }
                 className="border p-3 rounded-lg"
               />
             </div>
 
             <div className="grid md:grid-cols-2 gap-6">
-             <DatePicker
-  selected={formData.date ? new Date(formData.date) : null}
-  onChange={(date: Date | null) => {
-    if (!date) return;
-
-    // 🔴 SUNDAY CHECK
-    if (date.getDay() === 0) {
-      alert('❌ Sunday is a holiday. Please select another date.');
-      return;
-    }
-
-    setFormData({
-      ...formData,
-      date: date.toISOString().split('T')[0],
-      time: '',
-    });
-  }}
-  filterDate={(date: Date) => date.getDay() !== 0} // ❌ Disable Sundays
-  dateFormat="dd/MM/yyyy"
-  minDate={new Date()}
-  placeholderText="DD / MM / YYYY"
-  className="border p-3 rounded-lg w-full"
-/>
+              <DatePicker
+                selected={formData.date ? new Date(formData.date) : null}
+                onChange={(date: Date | null) => {
+                  if (!date) return;
+                  if (isSunday(date)) {
+                    alert('❌ Sunday is a holiday');
+                    return;
+                  }
+                  setFormData({
+                    ...formData,
+                    date: date.toISOString().split('T')[0],
+                    time: '',
+                  });
+                }}
+                filterDate={(date) => !isSunday(date)}
+                minDate={new Date()}
+                dateFormat="dd/MM/yyyy"
+                placeholderText="DD / MM / YYYY"
+                className="border p-3 rounded-lg w-full"
+              />
 
               <select
-                name="time"
-                value={formData.time}
-                onChange={handleChange}
                 required
+                value={formData.time}
+                onChange={(e) =>
+                  setFormData({ ...formData, time: e.target.value })
+                }
                 className="border p-3 rounded-lg"
               >
                 <option value="">Select time</option>
