@@ -41,7 +41,11 @@ interface AppointmentModalProps {
 
 /* ================= HELPERS ================= */
 
-const isSunday = (date: Date) => date.getDay() === 0;
+/** ✅ TypeScript-safe Sunday check */
+const isSunday = (date: Date | null): boolean => {
+  if (!date) return false;
+  return date.getDay() === 0;
+};
 
 const isDoctorOnLeave = async (dateStr: string) => {
   const snap = await getDoc(doc(db, 'doctor_leaves', dateStr));
@@ -71,7 +75,7 @@ export default function AppointmentModal({
   const [isOnLeave, setIsOnLeave] = useState(false);
   const [leaveMessage, setLeaveMessage] = useState('');
 
-  /* 🔄 RESET STATE WHEN MODAL OPENS */
+  /* 🔄 RESET WHEN MODAL OPENS */
   useEffect(() => {
     if (isOpen) {
       setSubmitted(false);
@@ -107,7 +111,7 @@ export default function AppointmentModal({
     checkLeave();
   }, [formData.date]);
 
-  /* ================= FETCH BOOKED TIMES (🔥 FINAL FIX) ================= */
+  /* ================= FETCH BOOKED TIMES ================= */
 
   useEffect(() => {
     if (!formData.date || isOnLeave) {
@@ -119,7 +123,7 @@ export default function AppointmentModal({
       const q = query(
         collection(db, 'appointments'),
         where('date', '==', formData.date),
-        where('status', 'in', ['Pending', 'In Progress']) // ✅ ONLY ACTIVE
+        where('status', 'in', ['Pending', 'In Progress'])
       );
 
       const snap = await getDocs(q);
@@ -133,12 +137,18 @@ export default function AppointmentModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (loading || isOnLeave) return;
 
+    /* 🔴 HARD SUNDAY BLOCK (SECURITY) */
+    if (formData.date && isSunday(new Date(formData.date))) {
+      alert('❌ Sunday is a holiday. Booking not allowed.');
+      return;
+    }
+
+    if (loading || isOnLeave) return;
     setLoading(true);
 
     try {
-      /* 🔴 PHONE DUPLICATE (SAME DATE) */
+      // PHONE duplicate
       const phoneQ = query(
         collection(db, 'appointments'),
         where('phone', '==', formData.phone),
@@ -150,7 +160,7 @@ export default function AppointmentModal({
         return;
       }
 
-      /* 🔴 NAME DUPLICATE (SAME DATE) */
+      // NAME duplicate
       const nameQ = query(
         collection(db, 'appointments'),
         where('name', '==', formData.name),
@@ -162,7 +172,7 @@ export default function AppointmentModal({
         return;
       }
 
-      /* 🔴 SLOT DUPLICATE (🔥 FINAL FIX) */
+      // SLOT duplicate
       const slotQ = query(
         collection(db, 'appointments'),
         where('date', '==', formData.date),
@@ -174,7 +184,7 @@ export default function AppointmentModal({
         return;
       }
 
-      /* 🔢 QUEUE NUMBER (ONLY ACTIVE) */
+      // QUEUE
       const queueQ = query(
         collection(db, 'appointments'),
         where('date', '==', formData.date),
@@ -183,7 +193,6 @@ export default function AppointmentModal({
       const queueSnap = await getDocs(queueQ);
       const queueNumber = queueSnap.size + 1;
 
-      /* ✅ SAVE */
       const appointment: AppointmentData = {
         ...formData,
         queueNumber,
@@ -273,6 +282,11 @@ export default function AppointmentModal({
                   });
                 }}
                 filterDate={(date) => !isSunday(date)}
+                dayClassName={(date) =>
+                  isSunday(date)
+                    ? 'text-red-500 bg-red-100 cursor-not-allowed'
+                    : ''
+                }
                 minDate={new Date()}
                 dateFormat="dd/MM/yyyy"
                 placeholderText="DD / MM / YYYY"
