@@ -40,6 +40,7 @@ export default function AdminDashboard() {
       collection(db, 'appointments'),
       orderBy('createdAt', 'desc')
     );
+
     const unsub = onSnapshot(q, (snap) => {
       setAppointments(
         snap.docs.map((d) => ({
@@ -48,6 +49,7 @@ export default function AdminDashboard() {
         }))
       );
     });
+
     return () => unsub();
   }, []);
 
@@ -82,7 +84,7 @@ export default function AdminDashboard() {
     await deleteDoc(doc(db, 'doctor_leaves', date));
   };
 
-  /* ❌ CANCEL APPOINTMENT (🔥 NEW) */
+  /* ❌ CANCEL APPOINTMENT (STATUS ONLY) */
   const cancelAppointment = async (id: string, name: string) => {
     const ok = confirm(`Cancel appointment for ${name}?`);
     if (!ok) return;
@@ -90,6 +92,14 @@ export default function AdminDashboard() {
     await updateDoc(doc(db, 'appointments', id), {
       status: 'Cancelled',
     });
+  };
+
+  /* 🗑️ DELETE APPOINTMENT (🔥 NEW – MANUAL DELETE) */
+  const deleteAppointment = async (id: string, name: string) => {
+    const ok = confirm(`❌ Permanently delete appointment for ${name}?`);
+    if (!ok) return;
+
+    await deleteDoc(doc(db, 'appointments', id));
   };
 
   /* 🔐 LOGOUT */
@@ -193,7 +203,7 @@ export default function AdminDashboard() {
                   <p><b>Time:</b> {a.time}</p>
 
                   <span
-                    className={`font-semibold ${
+                    className={`font-semibold block mt-1 ${
                       a.status === 'Cancelled'
                         ? 'text-red-600'
                         : 'text-orange-600'
@@ -202,14 +212,25 @@ export default function AdminDashboard() {
                     Status: {a.status || 'Pending'}
                   </span>
 
-                  {a.status !== 'Cancelled' && (
+                  {/* ACTION BUTTONS */}
+                  <div className="flex gap-2 mt-4">
+                    {a.status !== 'Cancelled' && (
+                      <button
+                        onClick={() => cancelAppointment(a.id, a.name)}
+                        className="flex-1 bg-orange-500 text-white py-2 rounded-lg font-semibold"
+                      >
+                        Cancel
+                      </button>
+                    )}
+
                     <button
-                      onClick={() => cancelAppointment(a.id, a.name)}
-                      className="mt-3 w-full bg-red-600 text-white py-2 rounded-lg font-semibold"
+                      onClick={() => deleteAppointment(a.id, a.name)}
+                      className="flex-1 bg-red-700 text-white py-2 rounded-lg font-semibold"
                     >
-                      Cancel Appointment
+                      Delete
                     </button>
-                  )}
+                  </div>
+
                 </div>
               ))}
             </div>
