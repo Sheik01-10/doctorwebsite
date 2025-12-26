@@ -41,6 +41,14 @@ interface AppointmentModalProps {
 
 /* ================= HELPERS ================= */
 
+/** ✅ FIX: Local date formatter (NO timezone bug) */
+const formatDateLocal = (date: Date): string => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
 /** ✅ TypeScript-safe Sunday check */
 const isSunday = (date: Date | null): boolean => {
   if (!date) return false;
@@ -277,7 +285,7 @@ export default function AppointmentModal({
                   }
                   setFormData({
                     ...formData,
-                    date: date.toISOString().split('T')[0],
+                    date: formatDateLocal(date),
                     time: '',
                   });
                 }}
