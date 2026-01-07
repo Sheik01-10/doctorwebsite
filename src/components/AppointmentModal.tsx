@@ -41,7 +41,6 @@ interface AppointmentModalProps {
 
 /* ================= HELPERS ================= */
 
-/** ✅ FIX: Local date formatter (NO timezone bug) */
 const formatDateLocal = (date: Date): string => {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -49,7 +48,6 @@ const formatDateLocal = (date: Date): string => {
   return `${y}-${m}-${d}`;
 };
 
-/** ✅ TypeScript-safe Sunday check */
 const isSunday = (date: Date | null): boolean => {
   if (!date) return false;
   return date.getDay() === 0;
@@ -146,8 +144,14 @@ export default function AppointmentModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    /* 🔴 HARD SUNDAY BLOCK (SECURITY) */
-    if (formData.date && isSunday(new Date(formData.date))) {
+    /* ❌ DATE + TIME COMPULSORY */
+    if (!formData.date || !formData.time) {
+      alert('❌ Please select both Date and Time');
+      return;
+    }
+
+    /* ❌ SUNDAY BLOCK */
+    if (isSunday(new Date(formData.date))) {
       alert('❌ Sunday is a holiday. Booking not allowed.');
       return;
     }
@@ -156,54 +160,9 @@ export default function AppointmentModal({
     setLoading(true);
 
     try {
-      // PHONE duplicate
-      const phoneQ = query(
-        collection(db, 'appointments'),
-        where('phone', '==', formData.phone),
-        where('date', '==', formData.date),
-        where('status', 'in', ['Pending', 'In Progress'])
-      );
-      if (!(await getDocs(phoneQ)).empty) {
-        alert('❌ This phone number is already booked for this date');
-        return;
-      }
-
-      // NAME duplicate
-      const nameQ = query(
-        collection(db, 'appointments'),
-        where('name', '==', formData.name),
-        where('date', '==', formData.date),
-        where('status', 'in', ['Pending', 'In Progress'])
-      );
-      if (!(await getDocs(nameQ)).empty) {
-        alert('❌ This name is already booked for this date');
-        return;
-      }
-
-      // SLOT duplicate
-      const slotQ = query(
-        collection(db, 'appointments'),
-        where('date', '==', formData.date),
-        where('time', '==', formData.time),
-        where('status', 'in', ['Pending', 'In Progress'])
-      );
-      if (!(await getDocs(slotQ)).empty) {
-        alert('❌ This time slot is already booked');
-        return;
-      }
-
-      // QUEUE
-      const queueQ = query(
-        collection(db, 'appointments'),
-        where('date', '==', formData.date),
-        where('status', 'in', ['Pending', 'In Progress'])
-      );
-      const queueSnap = await getDocs(queueQ);
-      const queueNumber = queueSnap.size + 1;
-
       const appointment: AppointmentData = {
         ...formData,
-        queueNumber,
+        queueNumber: 1,
         status: 'Pending',
       };
 
@@ -231,6 +190,7 @@ export default function AppointmentModal({
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl max-w-2xl w-full">
+
         {/* HEADER */}
         <div className="border-b px-6 py-4 flex justify-between items-center">
           <h2 className="text-2xl font-bold">Book Appointment</h2>
@@ -253,6 +213,7 @@ export default function AppointmentModal({
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="p-6 space-y-6">
+
             <div className="grid md:grid-cols-2 gap-6">
               <input
                 placeholder="Full Name"
@@ -290,11 +251,6 @@ export default function AppointmentModal({
                   });
                 }}
                 filterDate={(date) => !isSunday(date)}
-                dayClassName={(date) =>
-                  isSunday(date)
-                    ? 'text-red-500 bg-red-100 cursor-not-allowed'
-                    : ''
-                }
                 minDate={new Date()}
                 dateFormat="dd/MM/yyyy"
                 placeholderText="DD / MM / YYYY"
@@ -318,13 +274,20 @@ export default function AppointmentModal({
               </select>
             </div>
 
+            {/* 🔥 BUTTON DISABLE LOGIC */}
             <button
               type="submit"
-              disabled={loading}
-              className="w-full bg-blue-600 text-white py-3 rounded-lg"
+              disabled={loading || !formData.date || !formData.time}
+              className={`w-full py-3 rounded-lg font-semibold text-white
+                ${
+                  loading || !formData.date || !formData.time
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700'
+                }`}
             >
               {loading ? 'Booking…' : 'Book Appointment'}
             </button>
+
           </form>
         )}
       </div>
